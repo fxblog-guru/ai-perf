@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "perf-result/v1",
+  "title": "Performance run result (perf-standard v1.0, PS-G1)",
+  "description": "One run of any load tool, normalised. Durations in milliseconds, error_rate as a fraction 0..1, rps in requests per second. Numbers cover run.window only.",
+  "type": "object",
+  "required": ["schema", "run", "generator", "total", "endpoints"],
+  "properties": {
+    "schema": { "const": "perf-result/v1" },
+    "run": {
+      "type": "object",
+      "required": ["id", "tool", "tool_version", "environment", "profile", "target", "git_sha", "started_at", "ended_at", "window"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "tool": { "type": "string", "enum": ["locust", "gatling", "k6", "jmeter", "other"] },
+        "tool_version": { "type": "string" },
+        "environment": { "type": "string" },
+        "profile": { "type": "string" },
+        "target": { "type": "string" },
+        "git_sha": { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "ended_at": { "type": "string", "format": "date-time" },
+        "window": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["steady", "whole-run"], "description": "steady = ramps excluded (PS-D1); whole-run only for profiles without a steady state (smoke, stress, spike)" },
+            "from": { "type": "string", "format": "date-time" },
+            "to": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "required": ["host", "cpu_max_pct"],
+      "properties": {
+        "host": { "type": "string" },
+        "workers": { "type": "integer", "minimum": 0 },
+        "cpu_max_pct": { "type": ["number", "null"], "description": "null = not measured; the gate treats that as a gap, above 80 as NOT EVALUABLE (PS-A5)" }
+      }
+    },
+    "total": { "$ref": "#/$defs/stats" },
+    "endpoints": { "type": "object", "additionalProperties": { "$ref": "#/$defs/stats" } }
+  },
+  "$defs": {
+    "stats": {
+      "type": "object",
+      "required": ["requests", "failures", "error_rate", "rps", "p50_ms", "p90_ms", "p95_ms", "p99_ms", "max_ms"],
+      "properties": {
+        "requests": { "type": "integer", "minimum": 0 },
+        "failures": { "type": "integer", "minimum": 0 },
+        "error_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rps": { "type": "number", "minimum": 0 },
+        "p50_ms": { "type": ["number", "null"] },
+        "p90_ms": { "type": ["number", "null"] },
+        "p95_ms": { "type": ["number", "null"] },
+        "p99_ms": { "type": ["number", "null"] },
+        "max_ms": { "type": ["number", "null"] },
+        "apdex": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

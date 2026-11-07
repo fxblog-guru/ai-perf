@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ai-perf Pipeline</title>
+<style>
+/* App shell: fixed left menu, one section on screen at a time. Light by default; the toggle sets
+   data-theme="dark", and the system preference decides on first load. The console stays dark. */
+:root {
+  --bg: #f4f5f9; --side: #ffffff; --tile: #ffffff; --tile-2: #f7f8fc; --edge: #e2e5ef;
+  --ink: #141833; --muted: #5a6082; --dim: #8d92ad; --accent: #3d4de0; --accent-soft: #eceefe;
+  --gold: #b5832a; --gold-soft: #fbf3e2; --pass: #198754; --fail: #c8392f; --warn: #a26a00;
+  --term: #12152b;
+  --f-display: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  --bg: #0c0f1d; --side: #10142a; --tile: #151a33; --tile-2: #1a1f3d; --edge: #262c52;
+  --ink: #eceefb; --muted: #a0a6c8; --dim: #6f7599; --accent: #8f97ff; --accent-soft: #232a55;
+  --gold: #e2b765; --gold-soft: #2c2716; --pass: #5ad694; --fail: #ff7b72; --warn: #f2c260;
+  --term: #090b16; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+code { font-family: var(--f-mono); font-size: .88em; }
+p { margin: 0; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -.015em; }
+h1 { font-size: clamp(30px, 4.2vw, 50px); font-weight: 800; line-height: 1.05; }
+h1 em { font-style: normal; color: var(--accent); }
+h2 { font-size: clamp(22px, 2.6vw, 30px); font-weight: 700; line-height: 1.15; }
+h3 { font-size: 16px; font-weight: 700; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); }
+
+.app { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100%; }
+.side { position: sticky; top: 0; height: 100vh; background: var(--side); border-right: 1px solid var(--edge); display: flex; flex-direction: column; gap: 22px; padding: 24px 14px 18px; }
+.brand { display: grid; gap: 2px; padding: 0 8px; }
+.brand b { font-family: var(--f-display); font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.brand span { font-family: var(--f-mono); font-size: 11px; color: var(--dim); }
+.nav { display: grid; gap: 3px; }
+.nav button { display: grid; grid-template-columns: 26px 1fr; align-items: center; gap: 8px; text-align: left; padding: 9px 10px; border-radius: 10px; border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 14px; }
+.nav button .i { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-family: var(--f-mono); font-size: 12px; background: var(--tile-2); border: 1px solid var(--edge); }
+.nav button:hover { background: var(--tile-2); color: var(--ink); }
+.nav button[aria-current="page"] { background: var(--accent-soft); color: var(--ink); }
+.nav button[aria-current="page"] .i { background: var(--accent); color: #fff; border-color: var(--accent); }
+.side .foot { margin-top: auto; display: grid; gap: 10px; padding: 0 8px; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--edge); background: var(--tile); font-size: 13px; font-weight: 600; }
+.toggle .sw { width: 34px; height: 20px; border-radius: 999px; background: var(--edge); position: relative; transition: background .2s; }
+.toggle .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+:root[data-theme="dark"] .toggle .sw { background: var(--accent); }
+:root[data-theme="dark"] .toggle .sw::after { transform: translateX(14px); }
+.side .note { font-size: 11.5px; color: var(--dim); }
+
+main { min-width: 0; padding: 36px 28px 56px; }
+.panel { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; animation: in .35s ease-out; }
+@keyframes in { from { opacity: .3; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+.head { display: grid; gap: 8px; max-width: 70ch; }
+.kicker { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.lede { color: var(--muted); font-size: 16px; }
+.grid { display: grid; gap: 12px; }
+.tile { background: var(--tile); border: 1px solid var(--edge); border-radius: 16px; padding: 18px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.tile p, .tile li { color: var(--muted); font-size: 14px; }
+.btn { font-family: var(--f-mono); font-size: 12.5px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--edge); background: var(--tile); }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stat b { font-family: var(--f-display); font-size: 38px; font-weight: 800; line-height: 1; color: var(--accent); }
+.stat:nth-child(even) b { color: var(--gold); }
+.values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.value { grid-template-columns: 36px minmax(0, 1fr); column-gap: 14px; }
+.value .ico { grid-row: span 2; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--gold-soft); color: var(--gold); font-weight: 700; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.flow span { font-family: var(--f-mono); font-size: 12.5px; padding: 6px 11px; border-radius: 8px; background: var(--tile-2); border: 1px solid var(--edge); }
+.flow i { color: var(--dim); font-style: normal; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pos { font-size: 13px; color: var(--dim); }
+.stages { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 7px; }
+.stg { position: relative; aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--edge); background: var(--tile); padding: 8px; display: grid; align-content: space-between; text-align: left; overflow: hidden; transition: border-color .3s, background .3s, transform .3s; }
+.stg .n { font-family: var(--f-mono); font-size: 10.5px; color: var(--dim); }
+.stg .c { font-family: var(--f-mono); font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stg.done { background: var(--tile-2); }
+.stg.done .n { color: var(--pass); }
+.stg.now { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-2px); }
+.stg.now .n { color: var(--accent); }
+.stagebody { display: grid; gap: 12px; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+.console { background: var(--term); border-color: var(--term); padding: 0; gap: 0; color: #dde2f5; }
+.con-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #ffffff14; font-family: var(--f-mono); font-size: 12.5px; color: #aab1d6; }
+.lights { display: flex; gap: 6px; }
+.lights i { width: 10px; height: 10px; border-radius: 50%; }
+.lights i:nth-child(1) { background: #ff7b72; } .lights i:nth-child(2) { background: #f2c260; } .lights i:nth-child(3) { background: #5ad694; }
+.out { list-style: none; margin: 0; padding: 14px 16px 18px; font-family: var(--f-mono); font-size: 12.5px; display: grid; gap: 4px; min-height: 230px; }
+.out li { color: #dde2f5; white-space: pre-wrap; opacity: 0; transform: translateY(3px); animation: line .25s ease-out forwards; }
+@keyframes line { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .out li { animation: none; opacity: 1; transform: none; } }
+.out .ok { color: #5ad694; } .out .warn { color: #f2c260; } .out .bad { color: #ff7b72; } .out .dim { color: #7c84ad; }
+.how ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.facts { display: grid; gap: 8px; margin: 6px 0 0; }
+.facts div { border-radius: 10px; padding: 9px 12px; }
+.facts dt { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.facts dd { margin: 2px 0 0; font-size: 14px; }
+.facts .s { background: color-mix(in srgb, var(--fail) 10%, transparent); } .facts .s dt { color: var(--fail); }
+.facts .g { background: color-mix(in srgb, var(--pass) 10%, transparent); } .facts .g dt { color: var(--pass); }
+
+.doc { background: var(--tile-2); border: 1px solid var(--edge); border-radius: 12px; padding: 14px 16px; font-family: var(--f-mono); font-size: 12.5px; white-space: pre-wrap; overflow-x: auto; color: var(--ink); }
+.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl th, .tbl td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--edge); vertical-align: top; }
+.tbl th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.tbl td:first-child { font-weight: 600; }
+.tag { display: inline-block; font-family: var(--f-mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.tag.y { color: var(--pass); background: color-mix(in srgb, var(--pass) 12%, transparent); }
+.tag.p { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.tag.n { color: var(--fail); background: color-mix(in srgb, var(--fail) 12%, transparent); }
+.tbl-wrap { overflow-x: auto; }
+.steps3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.num { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: #fff; font-family: var(--f-mono); font-weight: 700; }
+
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; gap: 10px; }
+  .nav { grid-auto-flow: column; overflow-x: auto; }
+  .nav button { grid-template-columns: 1fr; }
+  .nav button .i { display: none; }
+  .side .foot { margin: 0; }
+  .side .note { display: none; }
+  main { padding: 20px 16px 40px; }
+  .stats, .values, .two, .steps3, .stagebody { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stages { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand"><b>ai-perf</b><span>v0.12.0 · Claude Code</span></div>
+  <nav class="nav" aria-label="Sections">
+    <button type="button" data-go="overview" aria-current="page"><span class="i">◎</span>Overview</button>
+    <button type="button" data-go="pipeline"><span class="i">▶</span>The pipeline</button>
+    <button type="button" data-go="result"><span class="i">✓</span>A verdict</button>
+    <button type="button" data-go="cause"><span class="i">⌕</span>Finding the cause</button>
+    <button type="button" data-go="learn"><span class="i">↺</span>It learns</button>
+    <button type="button" data-go="coverage"><span class="i">▦</span>Coverage</button>
+    <button type="button" data-go="start"><span class="i">⇣</span>Start</button>
+  </nav>
+  <div class="foot">
+    <button class="toggle" id="theme" type="button" aria-label="Dark mode">Dark <span class="sw"></span></button>
+    <p class="note">One sample project, <code>shop-api</code>, from nothing to a verdict.</p>
+  </div>
+</aside>
+
+<main>
+<!-- OVERVIEW -->
+<section class="panel" id="p-overview">
+  <div class="head">
+    <div class="kicker">Agentic performance testing</div>
+    <h1>Will it hold the load? <em>Ask, and get proof.</em></h1>
+    <p class="lede">One flow goes from "what does this system need to handle?" to a verdict a pipeline can trust. Code runs the load, and the AI explains it. Every number names its source.</p>
+  </div>
+  <div class="grid stats">
+    <div class="tile stat"><b>24</b><p>commands</p></div>
+    <div class="tile stat"><b>17</b><p>skills</p></div>
+    <div class="tile stat"><b>4</b><p>engines: Locust, k6, ws, fake</p></div>
+    <div class="tile stat"><b>4</b><p>targets: local, docker, ssh, k8s</p></div>
+  </div>
+  <div class="grid values">
+    <div class="tile value"><div class="ico">⚙</div><h3>Code runs the load</h3><p>A detached controller drives the workers and stops a runaway run. It survives the AI session closing.</p></div>
+    <div class="tile value"><div class="ico">⛔</div><h3>Never a silent pass</h3><p>A saturated generator, a lost worker or an unagreed SLO is in the verdict. A run that cannot be judged says so.</p></div>
+    <div class="tile value"><div class="ico">⌕</div><h3>Causes with evidence</h3><p>A full pool, locks or GC are read from the target's own metrics and named at the knee.</p></div>
+    <div class="tile value"><div class="ico">↺</div><h3>It learns by itself</h3><p>Its own mistakes are fixed in the next run, and the run after checks the fix. The team gets the lessons.</p></div>
+  </div>
+  <div class="tile">
+    <h3>The core flow</h3>
+    <div class="flow"><span>discover</span><i>→</i><span>plan</span><i>→</i><span>model</span><i>→</i><span>env</span><i>→</i><span>data</span><i>→</i><span>script</span><i>→</i><span>run</span><i>→</i><span>analyze</span><i>→</i><span>report</span><i>↺</i></div>
+  </div>
+  <div class="cta"><button class="btn primary" type="button" data-go="pipeline">Watch it run →</button><button class="btn" type="button" data-go="start">How to start</button></div>
+</section>
+
+<!-- PIPELINE -->
+<section class="panel" id="p-pipeline" hidden>
+  <div class="head">
+    <div class="kicker">The pipeline, step by step</div>
+    <h2>One project, ten steps, each with a gate</h2>
+    <p class="lede">Sample project <code>shop-api</code>: a REST API with a Postgres database. Click a square to jump.</p>
+  </div>
+  <div class="controls">
+    <button class="btn primary" id="play" type="button">Pause</button>
+    <button class="btn" id="prev" type="button" aria-label="Previous step">←</button>
+    <button class="btn" id="next" type="button">Next →</button>
+    <button class="btn" id="restart" type="button">Restart</button>
+    <span class="pos" id="pos"></span>
+  </div>
+  <div class="grid stages" id="stages"></div>
+  <div class="stagebody">
+    <div class="tile console" aria-live="polite">
+      <div class="con-head"><span class="lights"><i></i><i></i><i></i></span><span id="cmd"></span></div>
+      <ul class="out" id="out"></ul>
+    </div>
+    <div class="tile how">
+      <div class="kicker" id="how-k"></div>
+      <h3 id="how-t"></h3>
+      <ol id="how-l"></ol>
+      <dl class="facts">
+        <div class="s"><dt>Stops if</dt><dd id="stop"></dd></div>
+        <div class="g"><dt>You get</dt><dd id="get"></dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section class="panel" id="p-result" hidden>
+  <div class="head">
+    <div class="kicker">The outcome</div>
+    <h2>A verdict a business owner and a pipeline can both read</h2>
+    <p class="lede">A staircase of 50 → 400 users on <code>shop-api</code>. The first line is for the business; "Read with care" lists everything it rests on.</p>
+  </div>
+  <div class="grid two">
+    <div class="tile">
+      <h3>verdict.md</h3>
+<div class="doc"># Verdict: WARN
+
+It holds 200 users (412 requests/s) within the SLA;
+the planned peak is 180, so the headroom is 1.1×.
+
+| users | rps | p95 ms | error rate | within SLA |
+|  50   | 104 |  88    | 0          | yes        |
+| 100   | 207 |  96    | 0          | yes        |
+| 200   | 412 | 171    | 0.001      | yes        |
+| 400   | 431 | 1840   | 0.034      | no         |
+
+## Read with care
+- WARN: capacity 200 users leaves only 11 % headroom
+  over the planned peak of 180
+- environment parity: staging, half of production
+- SLOs not agreed with an owner: search</div>
+    </div>
+    <div class="tile">
+      <h3>Four outcomes, one exit code each</h3>
+      <table class="tbl">
+        <tr><th>Outcome</th><th>When</th><th>Exit</th></tr>
+        <tr><td><span class="tag y">PASS</span></td><td>every planned transaction within its SLO; no regression</td><td>0</td></tr>
+        <tr><td><span class="tag p">WARN</span></td><td>an SLO missed with the SLA met; a heavy tail; little headroom</td><td>0</td></tr>
+        <tr><td><span class="tag n">FAIL</span></td><td>an SLA breached; a regression above noise; capacity below the peak; the target died</td><td>1</td></tr>
+        <tr><td><span class="tag p">NOT EVALUABLE</span></td><td>a gate failed; no baseline; the generator saturated; a worker lost</td><td>3</td></tr>
+      </table>
+      <p>Each run has its own folder: <code>verdict.md</code>, <code>analysis.md</code>, <code>result.json</code> (perf-result/v1), and <code>junit.xml</code> for CI.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CAUSE -->
+<section class="panel" id="p-cause" hidden>
+  <div class="head">
+    <div class="kicker">Finding the cause</div>
+    <h2>From "it got slow" to "the pool was full"</h2>
+    <p class="lede">The analysis finds the knee, where p95 more than doubles while throughput stops growing. Then it reads what the target was doing at that moment.</p>
+  </div>
+  <div class="grid two">
+    <div class="tile">
+      <h3>Without signals</h3>
+<div class="doc">## Bottleneck
+
+not CPU in api: it stayed under 85 % while latency
+rose. The wait is in a pool, locks, a slow dependency
+or I/O, or in a part that was not monitored.
+Evidence: p95 96 -> 1840 ms at t=600s, rps flat at 431,
+CPU max 38 % (api).</div>
+      <p>Honest, but it leaves a person to dig through dashboards.</p>
+    </div>
+    <div class="tile">
+      <h3>With signals from <code>/metrics</code> or Prometheus</h3>
+<div class="doc">## Bottleneck
+
+waiting on db_pool: a connection pool was full:
+requests waited for a connection.
+Evidence: p95 96 -> 1840 ms at t=600s, rps flat at 431,
+CPU max 38 % (api), db_pool 100 % > 95;
+under their limits then: locks.
+
+## Signals
+| Signal  | Kind             | Highest | Limit | First above |
+| db_pool | pool_used_pct    | 100 %   | 95    | t=598s      |
+| locks   | db_locks_waiting | 0 locks | 0     | never       |</div>
+      <p>The cause is named, with the reading that proves it. A signal that stayed quiet is ruled out by name.</p>
+    </div>
+  </div>
+  <div class="tile">
+    <h3>What the signals cover</h3>
+    <div class="flow"><span>pool_used_pct</span><span>pool_waiting</span><span>db_locks_waiting</span><span>db_slow_queries</span><span>gc_time_pct</span><span>event_loop_lag_ms</span><span>thread_pool_queue</span><span>queue_depth</span><span>custom</span></div>
+    <p>They are read from HikariCP, prom-client, prometheus-net, <code>postgres_exporter</code>, <code>mysqld_exporter</code>, or any Prometheus query.</p>
+  </div>
+</section>
+
+<!-- LEARN -->
+<section class="panel" id="p-learn" hidden>
+  <div class="head">
+    <div class="kicker">The loop that keeps it honest</div>
+    <h2>It fixes its own mistakes, and checks the fix</h2>
+    <p class="lede">Every judged run teaches. What ai-perf got wrong in making the load is fixed in the next run; what only a person can fix is said so.</p>
+  </div>
+  <div class="grid two">
+    <div class="tile">
+<div class="doc">$ perf run load.json --until-evaluable
+attempt 1: NOT EVALUABLE
+  w0 at 97 % CPU in the measured window
+  fix: workers 2 -> 4 (problem:generator_saturated)
+attempt 2: PASS
+  fix verified by this run
+the spec file still says 2 workers; learned.json says 4</div>
+    </div>
+    <div class="tile">
+      <h3>What it fixes, and what it never touches</h3>
+      <ul>
+        <li><b>Fixed by itself:</b> a saturated generator gets more workers, a late engine a longer rampdown, dropped arrivals a higher VU cap.</li>
+        <li><b>Checked:</b> the next full run verifies the fix. After two recurrences it is rolled back and a person is asked.</li>
+        <li><b>Never touched:</b> the system under test, the planned load, the SLOs or the environment.</li>
+        <li><b>Remembered:</b> <code>perf brief</code> holds the project on one page of about 1500 tokens. <code>perf share</code> sends the lessons to the team's Recall.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- COVERAGE -->
+<section class="panel" id="p-coverage" hidden>
+  <div class="head">
+    <div class="kicker">What it covers</div>
+    <h2>Each project needs its own mix of tests</h2>
+    <p class="lede">The full map, with what is missing and in what order it will be built, is in <code>docs/coverage.md</code>.</p>
+  </div>
+  <div class="tile tbl-wrap">
+    <table class="tbl">
+      <tr><th>Test type</th><th>Question</th><th>State</th></tr>
+      <tr><td>Smoke</td><td>Does the wiring work?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Load</td><td>Does it meet the SLO at the peak? Closed or open model</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Stress, capacity</td><td>Where does it break, and what headroom is left?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Spike</td><td>Does it survive a jump, and come back in time?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Soak</td><td>Does it drift or leak over hours?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Regression, trend</td><td>Is this build slower, above noise? Is it slowly decaying?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Realtime</td><td>Does a WebSocket game hold its players, with ticks on time?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Bottleneck with evidence</td><td>Was it a pool, locks, GC or the event loop?</td><td><span class="tag y">covered</span></td></tr>
+      <tr><td>Breakpoint, configuration</td><td>How far past the peak? Which setting is faster?</td><td><span class="tag p">partial</span></td></tr>
+      <tr><td>Volume, scalability</td><td>Fast with production-sized data? Does a second instance double it?</td><td><span class="tag n">next</span></td></tr>
+      <tr><td>Resilience under load</td><td>What do users see when a node or the database fails over?</td><td><span class="tag n">next</span></td></tr>
+      <tr><td>Streaming, gRPC, queues</td><td>Time to first token? Consumer lag?</td><td><span class="tag n">next</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- START -->
+<section class="panel" id="p-start" hidden>
+  <div class="head">
+    <div class="kicker">Start</div>
+    <h2>Three steps to a first verdict</h2>
+  </div>
+  <div class="grid steps3">
+    <div class="tile"><div class="num">1</div><h3>Check the machine</h3><div class="doc">node bin/perf.mjs doctor</div><p>Node 20 or later. Locust or k6 when a real load is needed; the fake engine needs nothing.</p></div>
+    <div class="tile"><div class="num">2</div><h3>Try the demo</h3><div class="doc">node bin/perf.mjs run examples/quickstart/fake.json \
+  --root examples/quickstart --wait
+node bin/perf.mjs report \
+  --root examples/quickstart --slug demo --bootstrap</div></div>
+    <div class="tile"><div class="num">3</div><h3>Your project</h3><div class="doc">/perf-start      # new, or no perf tests
+/perf-import     # an existing suite
+/perf-help       # what now?</div></div>
+  </div>
+  <p class="lede">Read next: <code>docs/user-guide.md</code> for the practice, <code>docs/flows.md</code> for the diagrams, <code>CONTRACTS.md</code> for the rules.</p>
+</section>
+</main>
+</div>
+
+<script>
+const STEPS = [
+  { c: '/perf-discover', k: 'Understand', t: 'Read the system before asking', how: ['Reads the repo, the OpenAPI contract and its x-perf budgets', 'Measures what it can', 'Asks at most 3 questions, each with a proposed answer'],
+    out: [['$ perf discover --slug shop-api', 'dim'], ['found: openapi.yaml with x-perf budgets on 4 operations', ''], ['found: docker-compose.yml: api, postgres, postgres_exporter', ''], ['system kind: transactional (contract)', 'ok'], ['question 1/1: expected peak? proposed: 180 users (last sale, from logs)', 'warn'], ['wrote context.md, assumptions.json', 'ok']],
+    stop: 'a question only a person can answer has no answer yet', get: 'context.md: what the system is; assumptions.json: what nobody confirmed' },
+  { c: '/perf-plan', k: 'Prepare', t: 'Say what fast enough means', how: ['SLA from the contract, SLO 20 % stricter', 'Smoke and load always; stress, spike or soak only when a question needs it', 'Auto-stop rules from the SLA'],
+    out: [['$ perf contract --slug shop-api --ops search,checkout', 'dim'], ['checkout  SLA p95 800 ms  SLO p95 640 ms  (source: contract)', ''], ['search    SLA p95 400 ms  SLO p95 320 ms  (source: contract)', ''], ['profiles: smoke, load, stress', ''], ['$ perf check plan --slug shop-api', 'dim'], ['plan: PASS', 'ok']],
+    stop: 'a critical transaction has no measurable SLO, or an SLO is looser than its SLA', get: 'slo.json, every number with its source' },
+  { c: '/perf-model', k: 'Prepare', t: 'Model real users', how: ['Personas, journeys, think time, the mix', 'Open model when users arrive whatever the server does', "Little's law shown, so the numbers agree"],
+    out: [['personas: shopper 85 %, buyer 15 %', ''], ['model: open, 6 arrivals/s at the peak (users arrive whatever the server does)', ''], ["Little's law: 180 users = 6/s × (0.4 s + 29.6 s think)", ''], ['$ perf check model --slug shop-api', 'dim'], ['model: PASS (mix 100 %)', 'ok']],
+    stop: 'the mix does not sum to 100 %, or a number has no source', get: 'workload.json' },
+  { c: '/perf-env', k: 'Prepare', t: 'Decide where load may go', how: ['Allowed hosts and profiles, the owner, parity', 'Third parties stubbed', 'Monitoring and signals: what the target waits on'],
+    out: [['environment: staging  owner: platform-team  parity: half of production', ''], ['payments: stubbed', 'ok'], ['monitor: docker-stats [api, postgres]', ''], ['signals: db_pool (pool_used_pct), locks (db_locks_waiting)', ''], ['$ perf check env --slug shop-api', 'dim'], ['env: PASS', 'ok']],
+    stop: 'production; no owner; an unstubbed third party', get: 'env.json' },
+  { c: '/perf-data', k: 'Prepare', t: 'Enough data, cleaned after', how: ['One account per user, never shared', 'A cleanup command tied to the run id', 'Runs after every run'],
+    out: [['accounts: 400 generated (the top step is 400 users)', ''], ['cleanup: node scripts/cleanup.mjs --prefix $RUN_ID', ''], ['$ perf check data --slug shop-api', 'dim'], ['data: PASS', 'ok']],
+    stop: 'fewer unique accounts than users; no cleanup', get: 'data/manifest.json and the data' },
+  { c: '/perf-script', k: 'Prepare', t: 'A script that checks the business', how: ['Written for the chosen engine', 'Business checks beside the status code', 'A one-user smoke must pass every journey step'],
+    out: [['wrote k6/shop.js (open model: ramping-arrival-rate)', ''], ['$ perf run smoke.json --wait', 'dim'], ['smoke: 84 requests, 0 failures, every journey step passed', 'ok'], ['script: PASS', 'ok']],
+    stop: 'the smoke fails a journey step', get: 'the engine script, proven by a smoke' },
+  { c: '/perf-run', k: 'Run', t: 'Code runs the load', how: ['Quick doctor first: engine, secrets, allowlist, signals', 'The controller starts detached, with 4 workers', 'Cost estimate before a long run'],
+    out: [['$ perf doctor --spec stress.json', 'dim'], ['ok network/signals: 2 signal(s) read: db_pool 12, locks 0', 'ok'], ['$ perf run stress.json', 'dim'],['run 20261101-091502-7c1e started: 4 workers, about 25 min', ''], ['event phase_changed: steady, step 1 of 4 (50 users)', ''], ['…', 'dim']],
+    stop: 'a host outside the allowlist; a secret in a file; a missing engine', get: 'runs/<id>/, a run that survives the AI session closing' },
+  { c: '/perf-watch', k: 'Run', t: 'Woken by events only', how: ['No polling: token cost follows events, not run length', 'Explains each event', 'The controller stops a runaway run on its own'],
+    out: [['event phase_changed: step 3 of 4 (200 users)', ''], ['event phase_changed: step 4 of 4 (400 users)', ''], ['event anomaly: error rate 3.4 % at 400 users', 'warn'], ['event run_finished: done', 'ok']],
+    stop: 'never: it only watches. Auto-stop is the controller', get: 'watch.md: what happened, in order' },
+  { c: '/perf-analyze', k: 'Judge', t: 'The knee, and what caused it', how: ['Timeline per window', 'The knee: p95 doubles while rps stays flat', 'Signals at the knee name the wait'],
+    out: [['$ perf analyze --slug shop-api', 'dim'], ['knee at t=600s: p95 96 -> 1840 ms, rps flat at 431', 'warn'], ['waiting on db_pool: a connection pool was full', 'bad'], ['evidence: db_pool 100 % > 95; locks quiet', ''], ['failures: HTTP 503 (app: overloaded), 41 sampled with correlation ids', '']],
+    stop: 'a cause the evidence does not support: it says "not established"', get: 'analysis.md with the bottleneck and its evidence' },
+  { c: '/perf-report', k: 'Judge', t: 'A verdict that names what it rests on', how: ['SLOs, SLAs, capacity and headroom', 'The baseline, compared above noise', 'Lessons learned, the brief updated'],
+    out: [['$ perf report --slug shop-api --promote', 'dim'], ['VERDICT: WARN', 'warn'], ['summary: It holds 200 users (412 requests/s) within the SLA; the planned peak is 180, so the headroom is 1.1×.', ''], ['note: environment parity: half of production', 'dim'], ['learned: 1 lesson (bottleneck:waiting-on-db-pool)', 'ok']],
+    stop: 'a gate failed, or no baseline without --bootstrap: NOT EVALUABLE', get: 'verdict.md, verdict.json, and the exit code for CI' },
+];
+
+const $ = (id) => document.getElementById(id);
+const stages = $('stages');
+STEPS.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'stg'; b.setAttribute('aria-label', `Step ${i + 1}: ${s.c}`);
+  b.innerHTML = `<span class="n">${String(i + 1).padStart(2, '0')}</span><span class="c">${s.c.replace('/perf-', '')}</span>`;
+  b.addEventListener('click', () => { show(i); });
+  stages.appendChild(b);
+});
+
+let at = 0, playing = true, timer = null;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function show(i) {
+  at = (i + STEPS.length) % STEPS.length;
+  const s = STEPS[at];
+  [...stages.children].forEach((b, j) => { b.classList.toggle('done', j < at); b.classList.toggle('now', j === at); });
+  $('cmd').textContent = s.c; $('how-k').textContent = s.k; $('how-t').textContent = s.t;
+  $('how-l').innerHTML = s.how.map((h) => `<li>${h}</li>`).join('');
+  $('stop').textContent = s.stop; $('get').textContent = s.get;
+  $('pos').textContent = `Step ${at + 1} of ${STEPS.length}`;
+  const out = $('out'); out.innerHTML = '';
+  s.out.forEach(([text, cls], k) => {
+    const li = document.createElement('li'); li.textContent = text; if (cls) li.className = cls;
+    if (!reduced) li.style.animationDelay = `${k * 0.35}s`;
+    out.appendChild(li);
+  });
+  schedule();
+}
+function schedule() { clearTimeout(timer); if (playing) timer = setTimeout(() => show(at + 1), 2400 + STEPS[at].out.length * 350); }
+$('play').addEventListener('click', () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; schedule(); });
+$('next').addEventListener('click', () => show(at + 1));
+$('prev').addEventListener('click', () => show(at - 1));
+$('restart').addEventListener('click', () => show(0));
+
+const panels = ['overview', 'pipeline', 'result', 'cause', 'learn', 'coverage', 'start'];
+function go(name) {
+  panels.forEach((p) => { $(`p-${p}`).hidden = p !== name; });
+  document.querySelectorAll('.nav button').forEach((b) => b.toggleAttribute('aria-current', b.dataset.go === name));
+  document.querySelectorAll('.nav button[aria-current]').forEach((b) => b.setAttribute('aria-current', 'page'));
+  if (name === 'pipeline') show(at); else clearTimeout(timer);
+  scrollTo(0, 0);
+}
+document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => go(b.dataset.go)));
+document.addEventListener('keydown', (e) => {
+  if ($('p-pipeline').hidden) return;
+  if (e.key === 'ArrowRight') show(at + 1);
+  if (e.key === 'ArrowLeft') show(at - 1);
+  if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+});
+
+const root = document.documentElement;
+let theme = null;
+try { theme = localStorage.getItem('ai-perf-theme'); } catch { /* no storage */ }
+if (!theme) theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+root.dataset.theme = theme;
+$('theme').addEventListener('click', () => {
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('ai-perf-theme', root.dataset.theme); } catch { /* no storage */ }
+});
+</script>
+</body>
+</html>

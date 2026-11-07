@@ -1,0 +1,12 @@
+{
+  "slug": "demo", "engine": "fake", "workers": 2, "target_url": "http://127.0.0.1:9990",
+  "profile": { "name": "load", "users": 20, "warmup_s": 2, "ramp_s": 3, "steady_s": 10, "rampdown_s": 2 },
+  "engine_options": {
+    "rps_per_user": 5,
+    "endpoints": [
+      { "name": "listItems", "weight": 6, "median_ms": 40, "sigma": 0.3 },
+      { "name": "getItem", "weight": 3, "median_ms": 30, "sigma": 0.3 },
+      { "name": "createOrder", "weight": 1, "median_ms": 90, "sigma": 0.3 }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+# Sample GitLab CI job: the ai-perf smoke gate on every merge request (gating-perf-in-ci skill).
+# Copy it into the project's pipeline. The spec targets the bundled mock or an allowed dev host.
+perf-smoke:
+  stage: test
+  image: node:22-alpine
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - node mock/server.mjs 9990 &
+    # Wait until the mock answers: a target that is not up yet would refuse the run (exit 2).
+    - for i in $(seq 1 40); do wget -qO- http://127.0.0.1:9990/health && break; sleep 0.5; done
+    - node bin/perf.mjs ci .perf/demo/ci-smoke.json --root . --junit perf-junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: perf-junit.xml
+    paths:
+      - .perf/demo/runs/
+    expire_in: 2 weeks

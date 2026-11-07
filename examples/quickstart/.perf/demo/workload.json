@@ -1,0 +1,11 @@
+{
+  "model": "closed", "model_reason": "a fixed pool of shoppers browsing and buying",
+  "target": { "users": 20, "source": "default" },
+  "personas": [{ "name": "shopper", "share_pct": 100, "source": "default" }],
+  "journeys": [
+    { "name": "browse", "persona": "shopper", "weight_pct": 60, "steps": ["listItems"], "think_time_s": 0.15, "source": "default" },
+    { "name": "look", "persona": "shopper", "weight_pct": 30, "steps": ["getItem"], "think_time_s": 0.15, "source": "default" },
+    { "name": "buy", "persona": "shopper", "weight_pct": 10, "steps": ["createOrder"], "think_time_s": 0.15, "source": "default" }
+  ],
+  "littles_law": { "rps": 100, "response_s": 0.05, "think_s": 0.15, "users": 20 }
+}

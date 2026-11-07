@@ -1,0 +1,3 @@
+{ "accounts": { "count": 20, "source": "default" },
+  "cleanup": { "command": "none: the mock keeps orders in memory and forgets them when it stops" },
+  "run_id_prefix": true }

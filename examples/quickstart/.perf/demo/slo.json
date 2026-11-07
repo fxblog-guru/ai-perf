@@ -1,0 +1,8 @@
+{
+  "profiles": ["smoke", "load"],
+  "transactions": [
+    { "name": "listItems", "source": "default", "slo": { "p95_ms": 300, "error_rate": 0.01 }, "sla": { "p95_ms": 1000, "error_rate": 0.02 } },
+    { "name": "getItem", "source": "default", "slo": { "p95_ms": 300, "error_rate": 0.01 }, "sla": { "p95_ms": 1000, "error_rate": 0.02 } },
+    { "name": "createOrder", "source": "default", "slo": { "p95_ms": 500, "error_rate": 0.01 }, "sla": { "p95_ms": 1500, "error_rate": 0.02 } }
+  ]
+}

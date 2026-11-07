@@ -1,0 +1,4 @@
+node_modules/
+.perf/**/runs/
+*.log
+__pycache__/

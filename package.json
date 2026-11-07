@@ -1,0 +1,13 @@
+{
+  "name": "ai-perf",
+  "version": "0.14.0",
+  "private": true,
+  "description": "AI-driven performance testing: deterministic controller, engine-agnostic adapters, event-driven AI.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "bin": { "perf": "bin/perf.mjs" },
+  "scripts": {
+    "test": "node --test --test-concurrency=2 \"tests/*.test.mjs\"",
+    "mutate": "node tests/mutate.mjs"
+  }
+}

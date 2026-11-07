@@ -1,0 +1,5 @@
+{
+  "slug": "demo", "engine": "locust", "script": "locustfile.py", "workers": 2, "target_url": "http://127.0.0.1:9990",
+  "profile": { "name": "load", "users": 20, "warmup_s": 3, "ramp_s": 5, "steady_s": 20, "rampdown_s": 2 },
+  "timing": { "barrier_timeout_s": 120 }
+}
